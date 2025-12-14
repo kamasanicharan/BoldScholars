@@ -25,7 +25,7 @@ import { UserRole, UserProfile, ViewState, ContentItem, UpdatePost, Feedback, Va
 import { DocumentViewer } from './components/DocumentViewer';
 
 // Firebase Imports
-import { auth, googleProvider, db, storage } from './firebase';
+import { auth, googleProvider, db } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { 
   collection, 
@@ -38,7 +38,6 @@ import {
   getDoc,
   deleteDoc
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // --- Shared Components ---
 
@@ -789,16 +788,27 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
     setUploading(true);
 
     try {
-      // 1. Upload file to Firebase Storage
-      const storageRef = ref(storage, `materials/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      // 1. Upload to Hostinger PHP Script
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // 2. Save metadata to Firestore
+      // CHANGE THIS URL TO YOUR HOSTINGER DOMAIN
+      const response = await fetch('https://boldscholars.in/upload.php', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      // 2. Save metadata to Firestore using the URL from Hostinger
       await onAddContent({
         title,
         description: "Uploaded via Admin Dashboard",
-        fileUrl: downloadURL,
+        fileUrl: data.url,
         type: file.type.includes('video') ? 'video' : 'pdf',
         category: activeSection,
         subCategory: subCat,

@@ -1,22 +1,25 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { getAnalytics } from "firebase/analytics";
 
-// REPLACE THIS WITH YOUR ACTUAL CONFIG FROM FIREBASE CONSOLE
-// Go to Project Settings > General > Your Apps > SDK Setup and Configuration
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_HERE",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDNZFEaqPXXPImIB6sMnancvQHkxrBwIks",
+  authDomain: "boldscholars-4ce84.firebaseapp.com",
+  projectId: "boldscholars-4ce84",
+  storageBucket: "boldscholars-4ce84.firebasestorage.app",
+  messagingSenderId: "821466037858",
+  appId: "1:821466037858:web:e01164814daa9c0ff81b3b",
+  measurementId: "G-Y81CL8PN6Z"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
+// Initialize Services
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Storage removed - using Hostinger PHP script instead
+export const analytics = getAnalytics(app);
