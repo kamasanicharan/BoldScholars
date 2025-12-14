@@ -616,6 +616,9 @@ function App() {
   const handleDeleteContent = async (id: string) => {
     if(confirm("Are you sure you want to delete this item?")) await deleteDoc(doc(db, "content", id));
   }
+  const handleDeleteUpdate = async (id: string) => {
+    if(confirm("Are you sure you want to delete this announcement?")) await deleteDoc(doc(db, "updates", id));
+  }
   const handleViewContent = (item: ContentItem) => setActiveDocument(item); // No longer blocks guest users
 
   const filteredVaultContent = content.filter(c => c.category === 'Knowledge Vault' && c.subCategory === vaultTab);
@@ -774,25 +777,30 @@ function App() {
                       <p className="text-gray-400">No updates posted yet.</p>
                     </div>
                   )}
-                  {updates.map((update, idx) => (
+                  {updates.slice(0, 4).map((update, idx) => (
                     <motion.div 
                       key={update.id}
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
                       transition={{ delay: idx * 0.1 }}
-                      className="group p-8 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-100 transition-all cursor-default"
+                      className="group p-8 rounded-3xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-100 transition-all cursor-default relative"
                     >
+                      {user?.role === UserRole.ADMIN && (
+                         <button onClick={() => handleDeleteUpdate(update.id)} className="absolute top-6 right-6 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20">
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                      )}
                       <div className="flex justify-between items-start mb-6">
                         <span className="flex items-center gap-2 text-[10px] font-bold tracking-widest text-blue-600 uppercase bg-blue-50 px-3 py-1.5 rounded-full">
                           <ScrollText className="w-3 h-3" /> {update.date}
                         </span>
-                        {user?.role === UserRole.ADMIN && (
-                           <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-500">Posted by {update.author}</div>
-                        )}
                       </div>
                       <h3 className="font-bold text-2xl text-gray-900 mb-3 group-hover:text-blue-700 transition-colors">{update.title}</h3>
                       <p className="text-gray-500 leading-relaxed">{update.content}</p>
+                      {user?.role === UserRole.ADMIN && (
+                           <div className="mt-4 text-xs text-gray-400">Posted by {update.author}</div>
+                      )}
                     </motion.div>
                   ))}
                 </div>
@@ -1117,7 +1125,7 @@ function App() {
 
 // Extracted Admin Component
 const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => {
-  const [activeTab, setActiveTab] = useState<'content' | 'team'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'team' | 'feedback'>('content');
   const [activeSection, setActiveSection] = useState<'Knowledge Vault' | 'SET/NET'>('Knowledge Vault');
   const [uploading, setUploading] = useState(false);
   
@@ -1141,18 +1149,6 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
     if(!teamEmail) return;
     setTeamLoading(true);
     try {
-      // Logic: We create a placeholder user document with role: 'admin'
-      // When the user signs up with Google or Email, the main app logic checks this doc.
-      // Since we don't have the UID yet, we use email as ID or query by email.
-      // Firestore strategy: Store a separate 'admin_whitelist' or create a user doc with a dummy ID if possible.
-      // EASIER STRATEGY: Create a User Doc where ID = email (sanitized) or just Query by email on login.
-      // Current App Strategy uses UID. So we can't pre-create the "users/{uid}" doc easily.
-      
-      // SOLUTION: We will assume the user MUST create an account first (as a student), then we promote them.
-      // OR: We create a collection "admin_invites" and check it on login.
-      
-      // Simplified for this request: We just add a doc to a collection "users" with a custom ID (email) isn't right because auth uses UID.
-      // Let's search if a user with this email exists.
       const q = query(collection(db, "users"), where("email", "==", teamEmail));
       const querySnapshot = await getDocs(q);
       
@@ -1196,7 +1192,6 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
       const formData = new FormData();
       formData.append('file', file);
       
-      // Use absolute path for safety in case of routing issues, assuming site is at root
       const response = await fetch('/upload.php', { method: 'POST', body: formData });
       const data = await response.json();
 
@@ -1227,18 +1222,24 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
     <div className="max-w-7xl mx-auto px-4 py-12">
       <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
         <h2 className="text-3xl font-display font-bold text-gray-900">Admin Control Center</h2>
-        <div className="flex bg-gray-100 p-1 rounded-xl">
+        <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto">
            <button 
              onClick={() => setActiveTab('content')} 
-             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'content' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
+             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'content' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
            >
              Content & Updates
            </button>
            <button 
              onClick={() => setActiveTab('team')} 
-             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'team' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
+             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'team' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
            >
              Manage Team
+           </button>
+           <button 
+             onClick={() => setActiveTab('feedback')} 
+             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'feedback' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
+           >
+             User Feedback
            </button>
         </div>
       </div>
@@ -1354,6 +1355,43 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
                   </div>
                 ))}
              </div>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'feedback' && (
+        <div className="bg-white/60 backdrop-blur-md p-8 rounded-3xl shadow-sm border border-gray-200 min-h-[500px]">
+           <div className="flex items-center gap-3 mb-8">
+             <div className="bg-blue-100 text-blue-600 p-3 rounded-xl">
+               <MessageSquare className="w-6 h-6" />
+             </div>
+             <div>
+               <h3 className="text-2xl font-bold text-gray-900">User Feedback</h3>
+               <p className="text-gray-500">Messages sent via the Connect form.</p>
+             </div>
+           </div>
+           
+           <div className="grid gap-4">
+              {feedbacks.length === 0 && (
+                <div className="text-center py-12 text-gray-400">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  <p>No feedback received yet.</p>
+                </div>
+              )}
+              {feedbacks.map((f: any) => (
+                <div key={f.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                       <span className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-600 text-xs">
+                         {f.user[0]}
+                       </span>
+                       <span className="font-bold text-gray-900">{f.user}</span>
+                    </div>
+                    <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">{f.date}</span>
+                  </div>
+                  <p className="text-gray-600 leading-relaxed ml-10 bg-gray-50 p-4 rounded-xl rounded-tl-none text-sm">{f.message}</p>
+                </div>
+              ))}
            </div>
         </div>
       )}
