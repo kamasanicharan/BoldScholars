@@ -9,47 +9,36 @@ import {
   GraduationCap, 
   ScrollText, 
   MessageSquare,
-  LogIn,
   ShieldCheck,
   ChevronRight,
   FileText,
   Lightbulb,
-  Download,
   Search,
   ArrowRight,
   UploadCloud,
-  CheckCircle2,
-  Lock
+  Lock,
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserRole, UserProfile, ViewState, ContentItem, UpdatePost, Feedback, VaultSubCategory, MasterySubCategory } from './types';
-import { MOCK_USER, MOCK_ADMIN, INITIAL_UPDATES, INITIAL_CONTENT } from './constants';
 import { DocumentViewer } from './components/DocumentViewer';
 
-// --- Utils ---
-
-// Hook for localStorage persistence
-function usePersistentState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [state, setState] = useState<T>(() => {
-    try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      console.error(error);
-      return initialValue;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(state));
-    } catch (error) {
-      console.error(error);
-    }
-  }, [key, state]);
-
-  return [state, setState];
-}
+// Firebase Imports
+import { auth, googleProvider, db, storage } from './firebase';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  doc, 
+  setDoc, 
+  getDoc,
+  deleteDoc
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // --- Shared Components ---
 
@@ -131,93 +120,24 @@ const SectionHero = ({ title, subtitle, icon: Icon, pattern = "circles" }: any) 
 
 // --- Page Components ---
 
-const LoginPage = ({ onLogin }: { onLogin: (role: UserRole) => void }) => {
-  const [step, setStep] = useState<'role' | 'form'>('role');
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-
-  const handleRoleSelect = (role: UserRole) => {
-    setSelectedRole(role);
-    setStep('form');
-  };
-
+const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-2xl shadow-brand-900/10 border border-gray-100">
+      <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-2xl shadow-brand-900/10 border border-gray-100 text-center">
         <div className="flex justify-center mb-8">
           <Logo />
         </div>
         
-        <AnimatePresence mode='wait'>
-          {step === 'role' ? (
-            <motion.div
-              key="role"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Welcome! Who are you?</h2>
-              
-              <button 
-                onClick={() => handleRoleSelect(UserRole.USER)}
-                className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-100 hover:border-brand-500 hover:bg-brand-50 transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="bg-brand-100 p-3 rounded-lg text-brand-600 group-hover:bg-brand-500 group-hover:text-white transition-colors">
-                    <GraduationCap className="w-6 h-6" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold text-gray-900">Student</p>
-                    <p className="text-xs text-gray-500">Access learning materials</p>
-                  </div>
-                </div>
-                <ChevronRight className="text-gray-300 group-hover:text-brand-500" />
-              </button>
-
-              <button 
-                onClick={() => handleRoleSelect(UserRole.ADMIN)}
-                className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-100 hover:border-brand-500 hover:bg-brand-50 transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="bg-purple-100 p-3 rounded-lg text-purple-600 group-hover:bg-purple-500 group-hover:text-white transition-colors">
-                    <ShieldCheck className="w-6 h-6" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold text-gray-900">Admin</p>
-                    <p className="text-xs text-gray-500">Manage platform & content</p>
-                  </div>
-                </div>
-                <ChevronRight className="text-gray-300 group-hover:text-purple-500" />
-              </button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-6"
-            >
-              <div className="text-center mb-6">
-                <button onClick={() => setStep('role')} className="text-sm text-gray-400 hover:text-brand-600 mb-2">← Back to role selection</button>
-                <h2 className="text-xl font-bold text-gray-900">Login as {selectedRole === UserRole.USER ? 'Student' : 'Admin'}</h2>
-              </div>
-              
-              <form onSubmit={(e) => { e.preventDefault(); if(selectedRole) onLogin(selectedRole); }} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                  <input type="email" required className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand-500 outline-none transition-all" placeholder="you@example.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                  <input type="password" required className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand-500 outline-none transition-all" placeholder="••••••••" />
-                </div>
-                <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/30">
-                  Login
-                </button>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome Back</h2>
+        <p className="text-gray-500 mb-8">Sign in with your Google account to access the Knowledge Vault.</p>
+        
+        <button 
+          onClick={onLogin}
+          className="w-full flex items-center justify-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-brand-500 hover:bg-brand-50 transition-all group"
+        >
+          <img src="https://www.google.com/favicon.ico" alt="Google" className="w-6 h-6" />
+          <span className="font-bold text-gray-700 group-hover:text-brand-700">Continue with Google</span>
+        </button>
       </div>
     </div>
   );
@@ -227,7 +147,6 @@ const Hero = ({ onNavigate }: { onNavigate: (view: ViewState) => void }) => (
   <div className="relative pt-20 pb-32 px-4 overflow-hidden">
     <div className="absolute inset-0 bg-brand-50/50 -z-10"></div>
     
-    {/* Animated Background Shapes */}
     <div className="absolute top-20 right-0 w-[500px] h-[500px] bg-brand-200/30 rounded-full blur-3xl animate-blob"></div>
     <div className="absolute top-40 left-0 w-[400px] h-[400px] bg-purple-200/30 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
 
@@ -271,46 +190,140 @@ const Hero = ({ onNavigate }: { onNavigate: (view: ViewState) => void }) => (
 function App() {
   const [view, setView] = useState<ViewState>('home');
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeDocument, setActiveDocument] = useState<ContentItem | null>(null);
 
-  // Data State with Persistence
-  const [updates, setUpdates] = usePersistentState<UpdatePost[]>('bs_updates', INITIAL_UPDATES);
-  const [content, setContent] = usePersistentState<ContentItem[]>('bs_content', INITIAL_CONTENT);
-  const [feedbacks, setFeedbacks] = usePersistentState<Feedback[]>('bs_feedbacks', []);
+  // Live Data State
+  const [updates, setUpdates] = useState<UpdatePost[]>([]);
+  const [content, setContent] = useState<ContentItem[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
 
   // View Specific States
   const [vaultTab, setVaultTab] = useState<VaultSubCategory>('Course Materials');
   const [masteryTab, setMasteryTab] = useState<MasterySubCategory>('Course Materials');
 
-  // Admin Actions
-  const handleAddUpdate = (update: UpdatePost) => setUpdates([update, ...updates]);
-  const handleAddContent = (item: ContentItem) => setContent([item, ...content]);
-  const handleAddFeedback = (feedback: Feedback) => setFeedbacks([feedback, ...feedbacks]);
-  
-  // User Actions
-  const handleUpdateProfile = (updatedUser: UserProfile) => {
+  // --- 1. Authentication & User Logic ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        // Check if user profile exists in Firestore
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        // Define Super Admin Email
+        const SUPER_ADMIN = "boldscholars@gmail.com";
+        let role = UserRole.USER;
+        
+        // Logic: You are admin if you are the Super Admin OR if you were previously assigned admin role in DB
+        if (currentUser.email === SUPER_ADMIN) {
+          role = UserRole.ADMIN;
+        } else if (userSnap.exists() && userSnap.data().role === UserRole.ADMIN) {
+           role = UserRole.ADMIN;
+        }
+
+        const userData: UserProfile = {
+          uid: currentUser.uid,
+          name: currentUser.displayName || "Scholar",
+          email: currentUser.email || "",
+          avatarUrl: currentUser.photoURL || "",
+          role: role,
+          phone: userSnap.exists() ? userSnap.data().phone : "",
+          education: userSnap.exists() ? userSnap.data().education : "",
+          profession: userSnap.exists() ? userSnap.data().profession : "",
+        };
+
+        // Save/Update user in Firestore
+        await setDoc(userRef, { ...userData }, { merge: true });
+        setUser(userData);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      setView('dashboard');
+    } catch (error) {
+      console.error("Login failed", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setUser(null);
+    setView('home');
+  };
+
+  const handleUpdateProfile = async (updatedUser: UserProfile) => {
+    if (!user) return;
+    const userRef = doc(db, "users", user.uid);
+    await setDoc(userRef, {
+      phone: updatedUser.phone,
+      education: updatedUser.education,
+      profession: updatedUser.profession
+    }, { merge: true });
     setUser(updatedUser);
     alert("Profile updated successfully!");
   };
 
-  // Auth
-  const handleLogin = (role: UserRole) => {
-    // For this demo, we reset the user state to the mock data when logging in
-    // In a real app, this would fetch the user's specific data
-    setUser(role === UserRole.ADMIN ? MOCK_ADMIN : MOCK_USER);
-    setView(role === UserRole.ADMIN ? 'admin' : 'dashboard');
+  // --- 2. Real-time Data Listeners ---
+  useEffect(() => {
+    // Listen to Content
+    const qContent = query(collection(db, "content"), orderBy("date", "desc"));
+    const unsubContent = onSnapshot(qContent, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContentItem));
+      setContent(items);
+    });
+
+    // Listen to Updates
+    const qUpdates = query(collection(db, "updates"), orderBy("date", "desc"));
+    const unsubUpdates = onSnapshot(qUpdates, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UpdatePost));
+      setUpdates(items);
+    });
+
+    // Listen to Feedbacks (Only if admin, strictly speaking, but for simplicity we load it)
+    const qFeedback = query(collection(db, "feedbacks"), orderBy("date", "desc"));
+    const unsubFeedback = onSnapshot(qFeedback, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Feedback));
+      setFeedbacks(items);
+    });
+
+    return () => {
+      unsubContent();
+      unsubUpdates();
+      unsubFeedback();
+    };
+  }, []);
+
+  // --- 3. Admin Actions (Writes to Firebase) ---
+  const handleAddUpdate = async (update: UpdatePost) => {
+    await addDoc(collection(db, "updates"), update);
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setView('home');
-    setIsMenuOpen(false);
+  const handleAddContent = async (item: ContentItem) => {
+    await addDoc(collection(db, "content"), item);
   };
+
+  const handleAddFeedback = async (feedback: Feedback) => {
+    await addDoc(collection(db, "feedbacks"), feedback);
+  };
+
+  const handleDeleteContent = async (id: string) => {
+    if(confirm("Are you sure you want to delete this item?")) {
+      await deleteDoc(doc(db, "content", id));
+    }
+  }
 
   const handleViewContent = (item: ContentItem) => {
     if (item.locked && !user) {
-      if(confirm("This content is exclusive to Bold Scholars members. Would you like to login?")) {
+      if(confirm("This content is exclusive to Bold Scholars members. Please login with Google.")) {
         setView('login');
       }
       return;
@@ -332,6 +345,14 @@ function App() {
       {label}
     </button>
   );
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-white">
+        <Loader2 className="w-10 h-10 text-brand-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 flex flex-col">
@@ -428,6 +449,7 @@ function App() {
                 </div>
                 
                 <div className="grid md:grid-cols-2 gap-8">
+                  {updates.length === 0 && <p className="text-gray-500">No updates yet.</p>}
                   {updates.map((update, idx) => (
                     <motion.div 
                       key={update.id}
@@ -452,7 +474,7 @@ function App() {
         )}
 
         {/* --- LOGIN VIEW --- */}
-        {view === 'login' && <LoginPage onLogin={handleLogin} />}
+        {view === 'login' && <LoginPage onLogin={handleGoogleLogin} />}
 
         {/* --- KNOWLEDGE VAULT VIEW --- */}
         {view === 'vault' && (
@@ -481,17 +503,24 @@ function App() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-brand-900/5 transition-all group"
+                    className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-brand-900/5 transition-all group relative"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-3 bg-brand-50 rounded-lg text-brand-600 group-hover:scale-110 transition-transform">
                         {item.type === 'pdf' ? <FileText className="w-6 h-6" /> : <BookOpen className="w-6 h-6" />}
                       </div>
-                      {item.locked && (
-                        <div className="bg-amber-100 text-amber-700 p-1.5 rounded-full" title="Login Required">
-                          <Lock className="w-4 h-4" />
-                        </div>
-                      )}
+                      <div className="flex gap-2">
+                        {item.locked && (
+                          <div className="bg-amber-100 text-amber-700 p-1.5 rounded-full" title="Login Required">
+                            <Lock className="w-4 h-4" />
+                          </div>
+                        )}
+                        {user?.role === UserRole.ADMIN && (
+                          <button onClick={() => handleDeleteContent(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-full">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <h3 className="font-bold text-lg mb-2 text-gray-900 line-clamp-1">{item.title}</h3>
                     <p className="text-sm text-gray-500 mb-6 line-clamp-2 min-h-[2.5rem]">{item.description}</p>
@@ -540,7 +569,7 @@ function App() {
                     key={item.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="flex flex-col md:flex-row items-center gap-6 p-6 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-brand-300 transition-colors"
+                    className="flex flex-col md:flex-row items-center gap-6 p-6 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-brand-300 transition-colors relative"
                   >
                     <div className="bg-brand-50 p-4 rounded-full text-brand-600 shrink-0">
                       <Lightbulb className="w-6 h-6" />
@@ -549,6 +578,11 @@ function App() {
                       <h4 className="font-bold text-lg text-gray-900">{item.title}</h4>
                       <p className="text-gray-500 text-sm mt-1">{item.description}</p>
                     </div>
+                     {user?.role === UserRole.ADMIN && (
+                        <button onClick={() => handleDeleteContent(item.id)} className="absolute top-4 right-4 p-1.5 text-red-500 hover:bg-red-50 rounded-full">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     <button 
                       onClick={() => handleViewContent(item)}
                       className="shrink-0 px-6 py-2 bg-gray-900 text-white rounded-lg font-medium hover:bg-brand-600 transition-colors"
@@ -731,11 +765,56 @@ function App() {
 // Extracted Admin Component for cleaner code
 const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => {
   const [activeSection, setActiveSection] = useState<'Knowledge Vault' | 'SET/NET'>('Knowledge Vault');
+  const [uploading, setUploading] = useState(false);
   
   // Dynamic subcategories based on active section
   const subCategories = activeSection === 'Knowledge Vault' 
     ? ['Course Materials', 'Study Guides', 'E-Books & PDFs', 'FAQs']
     : ['Course Materials', 'Exam Overview', 'Practice Papers', 'Tips & Strategy'];
+
+  // Handle file upload
+  const handleFileUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const title = (form.elements.namedItem('title') as HTMLInputElement).value;
+    const subCat = (form.elements.namedItem('subCategory') as HTMLSelectElement).value as any;
+    const fileInput = form.elements.namedItem('file') as HTMLInputElement;
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert("Please select a file to upload.");
+      return;
+    }
+
+    const file = fileInput.files[0];
+    setUploading(true);
+
+    try {
+      // 1. Upload file to Firebase Storage
+      const storageRef = ref(storage, `materials/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // 2. Save metadata to Firestore
+      await onAddContent({
+        title,
+        description: "Uploaded via Admin Dashboard",
+        fileUrl: downloadURL,
+        type: file.type.includes('video') ? 'video' : 'pdf',
+        category: activeSection,
+        subCategory: subCat,
+        date: new Date().toISOString().split('T')[0],
+        locked: true
+      });
+
+      alert("Uploaded successfully!");
+      form.reset();
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Upload failed. Check console.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
@@ -743,7 +822,7 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
         <h2 className="text-3xl font-display font-bold text-gray-900">Admin Control Center</h2>
         <div className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2 rounded-full border border-purple-100">
           <ShieldCheck className="w-5 h-5" />
-          <span className="font-bold text-sm">Super Admin Access</span>
+          <span className="font-bold text-sm">Super Admin: {user.email}</span>
         </div>
       </div>
 
@@ -755,25 +834,7 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
              <h3 className="text-xl font-bold text-gray-800">Upload Learning Material</h3>
           </div>
           
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const form = e.target as HTMLFormElement;
-            const title = (form.elements.namedItem('title') as HTMLInputElement).value;
-            const subCat = (form.elements.namedItem('subCategory') as HTMLSelectElement).value as any; // Cast to specific string union type
-            
-            onAddContent({
-              id: Date.now().toString(),
-              title,
-              description: "Newly uploaded content by Admin.",
-              type: 'pdf',
-              category: activeSection,
-              subCategory: subCat,
-              date: new Date().toISOString().split('T')[0],
-              locked: true
-            });
-            form.reset();
-            alert(`Successfully added to ${activeSection} > ${subCat}`);
-          }}>
+          <form onSubmit={handleFileUpload}>
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Target Section</label>
@@ -807,14 +868,13 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
                <input name="title" required placeholder="ex: Advanced Algorithms Notes" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none" />
             </div>
 
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50 hover:bg-white hover:border-brand-400 transition-colors cursor-pointer group mb-6">
-               <UploadCloud className="w-10 h-10 text-gray-400 mx-auto mb-2 group-hover:text-brand-500 transition-colors" />
-               <p className="text-gray-500 font-medium">Click to upload file (PDF, Video)</p>
-               <p className="text-xs text-gray-400 mt-1">Max size: 50MB</p>
+            <div className="mb-6">
+               <label className="block text-sm font-bold text-gray-700 mb-2">File Upload</label>
+               <input type="file" name="file" required className="w-full p-2 border border-gray-300 rounded-lg" />
             </div>
 
-            <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-colors">
-              Publish Content
+            <button type="submit" disabled={uploading} className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-colors disabled:bg-gray-400">
+              {uploading ? "Uploading..." : "Publish Content"}
             </button>
           </form>
         </div>
@@ -828,7 +888,6 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
                 e.preventDefault();
                 const form = e.target as HTMLFormElement;
                 onAddUpdate({
-                  id: Date.now().toString(),
                   title: (form.elements.namedItem('title') as HTMLInputElement).value,
                   content: (form.elements.namedItem('content') as HTMLTextAreaElement).value,
                   date: new Date().toISOString().split('T')[0],
@@ -841,26 +900,6 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
                <textarea name="content" required placeholder="Message..." className="w-full mb-3 p-3 bg-gray-50 rounded-lg border-none text-sm h-24 resize-none" />
                <button className="w-full bg-gray-900 text-white py-2 rounded-lg font-bold text-sm hover:bg-gray-800">Post</button>
              </form>
-           </div>
-
-           {/* Feedback Feed */}
-           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-             <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><MessageSquare className="w-5 h-5 text-accent-500"/> Recent Feedback</h3>
-             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-               {feedbacks.length === 0 ? (
-                 <p className="text-center text-gray-400 text-sm py-4">No messages yet.</p>
-               ) : (
-                 feedbacks.map(f => (
-                   <div key={f.id} className="text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
-                     <div className="flex justify-between mb-1">
-                       <span className="font-bold text-gray-900">{f.user}</span>
-                       <span className="text-xs text-gray-400">{f.date}</span>
-                     </div>
-                     <p className="text-gray-600 leading-snug">{f.message}</p>
-                   </div>
-                 ))
-               )}
-             </div>
            </div>
         </div>
       </div>

@@ -5,6 +5,7 @@ export enum UserRole {
 }
 
 export interface UserProfile {
+  uid: string;
   name: string;
   email: string;
   phone: string;
@@ -21,11 +22,12 @@ export interface ContentItem {
   id: string;
   title: string;
   description: string;
+  fileUrl?: string; // URL from Firebase Storage
   type: 'pdf' | 'video' | 'article';
   category: 'Knowledge Vault' | 'SET/NET';
   subCategory: VaultSubCategory | MasterySubCategory;
   date: string;
-  locked: boolean; // Requires login
+  locked: boolean;
 }
 
 export interface UpdatePost {

@@ -1,8 +1,21 @@
 import { ContentItem, UpdatePost, UserProfile, UserRole } from './types';
 
+// Hardcoded credentials for the demo
+export const DEMO_CREDENTIALS = {
+  admin: {
+    email: "admin@boldscholars.com",
+    password: "admin123"
+  },
+  student: {
+    email: "student@boldscholars.com",
+    password: "student123"
+  }
+};
+
 export const MOCK_USER: UserProfile = {
+  uid: "mock-user-123",
   name: "Alex Scholar",
-  email: "alex@example.com",
+  email: "student@boldscholars.com",
   phone: "+1 234 567 8900",
   education: "B.Tech Computer Science",
   profession: "Software Intern",
@@ -11,6 +24,7 @@ export const MOCK_USER: UserProfile = {
 };
 
 export const MOCK_ADMIN: UserProfile = {
+  uid: "mock-admin-456",
   name: "Dr. Sarah Admin",
   email: "admin@boldscholars.com",
   phone: "+1 987 654 3210",
