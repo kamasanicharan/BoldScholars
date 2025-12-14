@@ -26,6 +26,31 @@ import { UserRole, UserProfile, ViewState, ContentItem, UpdatePost, Feedback, Va
 import { MOCK_USER, MOCK_ADMIN, INITIAL_UPDATES, INITIAL_CONTENT } from './constants';
 import { DocumentViewer } from './components/DocumentViewer';
 
+// --- Utils ---
+
+// Hook for localStorage persistence
+function usePersistentState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [state, setState] = useState<T>(() => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(error);
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch (error) {
+      console.error(error);
+    }
+  }, [key, state]);
+
+  return [state, setState];
+}
+
 // --- Shared Components ---
 
 const Logo = () => (
@@ -249,10 +274,10 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeDocument, setActiveDocument] = useState<ContentItem | null>(null);
 
-  // Data State
-  const [updates, setUpdates] = useState<UpdatePost[]>(INITIAL_UPDATES);
-  const [content, setContent] = useState<ContentItem[]>(INITIAL_CONTENT);
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  // Data State with Persistence
+  const [updates, setUpdates] = usePersistentState<UpdatePost[]>('bs_updates', INITIAL_UPDATES);
+  const [content, setContent] = usePersistentState<ContentItem[]>('bs_content', INITIAL_CONTENT);
+  const [feedbacks, setFeedbacks] = usePersistentState<Feedback[]>('bs_feedbacks', []);
 
   // View Specific States
   const [vaultTab, setVaultTab] = useState<VaultSubCategory>('Course Materials');
@@ -262,9 +287,17 @@ function App() {
   const handleAddUpdate = (update: UpdatePost) => setUpdates([update, ...updates]);
   const handleAddContent = (item: ContentItem) => setContent([item, ...content]);
   const handleAddFeedback = (feedback: Feedback) => setFeedbacks([feedback, ...feedbacks]);
+  
+  // User Actions
+  const handleUpdateProfile = (updatedUser: UserProfile) => {
+    setUser(updatedUser);
+    alert("Profile updated successfully!");
+  };
 
   // Auth
   const handleLogin = (role: UserRole) => {
+    // For this demo, we reset the user state to the mock data when logging in
+    // In a real app, this would fetch the user's specific data
     setUser(role === UserRole.ADMIN ? MOCK_ADMIN : MOCK_USER);
     setView(role === UserRole.ADMIN ? 'admin' : 'dashboard');
   };
@@ -277,7 +310,6 @@ function App() {
 
   const handleViewContent = (item: ContentItem) => {
     if (item.locked && !user) {
-      // Prompt login instead of simple alert
       if(confirm("This content is exclusive to Bold Scholars members. Would you like to login?")) {
         setView('login');
       }
@@ -632,20 +664,35 @@ function App() {
                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Active Scholar</span>
                   </div>
                   
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Educational Info</label>
-                      <input defaultValue={user.education} className="w-full p-3 bg-gray-50 rounded-lg border-none font-medium text-gray-700" />
-                      <input defaultValue={user.profession} className="w-full p-3 bg-gray-50 rounded-lg border-none font-medium text-gray-700" />
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const phone = (form.elements.namedItem('phone') as HTMLInputElement).value;
+                    const education = (form.elements.namedItem('education') as HTMLInputElement).value;
+                    const profession = (form.elements.namedItem('profession') as HTMLInputElement).value;
+                    
+                    handleUpdateProfile({
+                      ...user,
+                      phone,
+                      education,
+                      profession
+                    });
+                  }}>
+                    <div className="grid md:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Educational Info</label>
+                        <input name="education" defaultValue={user.education} className="w-full p-3 bg-gray-50 rounded-lg border-none font-medium text-gray-700" placeholder="Your degree" />
+                        <input name="profession" defaultValue={user.profession} className="w-full p-3 bg-gray-50 rounded-lg border-none font-medium text-gray-700" placeholder="Current profession" />
+                      </div>
+                      <div className="space-y-4">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Contact Details</label>
+                        <input name="phone" defaultValue={user.phone} className="w-full p-3 bg-gray-50 rounded-lg border-none font-medium text-gray-700" placeholder="Phone number" />
+                        <button type="submit" className="w-full py-3 bg-gray-900 text-white rounded-lg font-bold hover:bg-brand-600 transition-colors">
+                          Update Profile
+                        </button>
+                      </div>
                     </div>
-                    <div className="space-y-4">
-                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Contact Details</label>
-                      <input defaultValue={user.phone} className="w-full p-3 bg-gray-50 rounded-lg border-none font-medium text-gray-700" />
-                      <button onClick={() => alert("Saved")} className="w-full py-3 bg-gray-900 text-white rounded-lg font-bold hover:bg-brand-600 transition-colors">
-                        Update Profile
-                      </button>
-                    </div>
-                  </div>
+                  </form>
                </div>
             </div>
           </div>
@@ -712,7 +759,7 @@ const DashboardAdmin = ({ feedbacks, onAddUpdate, onAddContent, user }: any) => 
             e.preventDefault();
             const form = e.target as HTMLFormElement;
             const title = (form.elements.namedItem('title') as HTMLInputElement).value;
-            const subCat = (form.elements.namedItem('subCategory') as HTMLSelectElement).value;
+            const subCat = (form.elements.namedItem('subCategory') as HTMLSelectElement).value as any; // Cast to specific string union type
             
             onAddContent({
               id: Date.now().toString(),
